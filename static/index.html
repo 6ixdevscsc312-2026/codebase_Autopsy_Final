@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Codebase Autopsy — IBM Bob 2.0</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0A0C10; --panel:#12151B; --panel-alt:#1B2028; --text:#E4E7EC;
+    --muted:#7B8494; --border:#232830; --flag:#E4572E; --flag-dim:#E4572E22;
+    --healthy:#3DDC97; --warn:#E8B34A; --warn-dim:#E8B34A22;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family:"IBM Plex Sans",sans-serif; line-height:1.55;
+    padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .mono { font-family:"IBM Plex Mono",monospace; }
+  .wrap { max-width:980px; margin:0 auto; padding:0 20px; }
+  a { color:inherit; }
+
+  .topbar { border-bottom:1px solid var(--border); }
+  .topbar .wrap { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; }
+  .brand { font-weight:700; font-size:1.05rem; }
+  .badge { display:inline-flex; align-items:center; gap:6px; background:var(--panel-alt);
+    border:1px solid var(--border); padding:5px 11px; font-size:0.74rem; color:var(--muted); }
+  .badge b { color:var(--flag); }
+
+  .hero { padding:64px 0 48px; border-bottom:1px solid var(--border); }
+  .eyebrow { font-size:0.72rem; letter-spacing:0.08em; color:var(--flag); font-weight:600; margin-bottom:14px; }
+  h1 { font-size:2.4rem; margin:0 0 18px; font-weight:700; letter-spacing:-0.02em; max-width:620px; }
+  .hero-sub { color:var(--muted); font-size:1.05rem; max-width:560px; margin-bottom:28px; }
+  .cta-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:32px; }
+  .btn { display:inline-block; padding:12px 22px; font-weight:600; font-size:0.9rem;
+    text-decoration:none; cursor:pointer; border:none; font-family:inherit; }
+  .btn-primary { background:var(--flag); color:#0A0C10; }
+  .btn-ghost { background:transparent; color:var(--text); border:1px solid var(--border); }
+  .mini-stats { display:flex; gap:24px; flex-wrap:wrap; font-size:0.78rem; color:var(--muted); }
+  .mini-stats span::before { content:"— "; color:var(--flag); }
+
+  section.page { padding:56px 0; border-bottom:1px solid var(--border); }
+  .section-eyebrow { font-size:0.72rem; letter-spacing:0.08em; color:var(--muted); font-weight:600; margin-bottom:10px; }
+  h2 { font-size:1.5rem; margin:0 0 18px; }
+
+  .problem-grid { display:grid; grid-template-columns:1.1fr 1fr; gap:36px; align-items:start; }
+  @media (max-width:760px) { .problem-grid { grid-template-columns:1fr; } }
+  .problem-grid p { color:var(--muted); margin:0 0 14px; }
+  .case-card { border:1px solid var(--flag); background:var(--panel); padding:18px; }
+  .case-card .path { font-size:0.85rem; margin-bottom:12px; }
+  .case-row { font-size:0.82rem; margin-bottom:8px; }
+  .case-row .k { color:var(--muted); display:block; font-size:0.68rem; letter-spacing:0.05em; margin-bottom:2px; }
+
+  .pipeline { display:flex; border:1px solid var(--border); background:var(--panel); overflow:hidden; }
+  @media (max-width:700px) { .pipeline { flex-direction:column; } }
+  .pipe-stage { flex:1; padding:18px 16px; border-right:1px solid var(--border); }
+  .pipe-stage:last-child { border-right:none; }
+  .pipe-num { font-size:0.7rem; color:var(--flag); }
+  .pipe-name { font-weight:600; margin:4px 0 6px; font-size:1rem; }
+  .pipe-desc { font-size:0.8rem; color:var(--muted); }
+
+  .value-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:700px) { .value-grid { grid-template-columns:1fr; } }
+  .value-card { border:1px solid var(--border); background:var(--panel); padding:20px; }
+  .value-card .n { font-size:0.72rem; color:var(--flag); margin-bottom:8px; }
+  .value-card h3 { font-size:1rem; margin:0 0 8px; }
+  .value-card p { font-size:0.85rem; color:var(--muted); margin:0; }
+
+  form { display:flex; gap:8px; flex-wrap:wrap; margin:20px 0 6px; }
+  input[type=text] { flex:1; min-width:220px; background:var(--panel); border:1px solid var(--border);
+    color:var(--text); padding:10px 12px; font-family:"IBM Plex Mono",monospace; font-size:0.85rem; }
+  button { background:var(--flag); color:#0A0C10; border:none; padding:10px 18px;
+    font-weight:600; cursor:pointer; font-size:0.85rem; font-family:inherit; }
+  button:disabled { opacity:0.5; cursor:default; }
+  button.ghost { background:transparent; color:var(--text); border:1px solid var(--border); }
+  label.mock { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:0.82rem; }
+  .example-row { margin-bottom:20px; }
+  .example-row button { font-size:0.76rem; padding:5px 10px; }
+  .cold-start-note { font-size:0.78rem; color:var(--warn); background:var(--warn-dim);
+    border:1px solid var(--warn); padding:8px 12px; margin-bottom:14px; }
+
+  .status { font-size:0.82rem; color:var(--muted); margin-bottom:20px; min-height:1.2em; }
+  .status.error { color:var(--flag); }
+  .status.warn { color:var(--warn); }
+
+  .section-label { font-size:0.72rem; color:var(--muted); letter-spacing:0.06em; margin-bottom:12px; }
+  .subsection { margin-bottom:28px; }
+
+  .summary-banner { border:1px solid var(--warn); background:var(--warn-dim); padding:12px 16px;
+    font-size:0.9rem; margin-bottom:16px; }
+  .summary-banner.clean { border-color:var(--healthy); background:#3DDC9722; }
+
+  .stats { display:flex; gap:24px; border:1px solid var(--border); background:var(--panel);
+    padding:14px 18px; font-size:0.85rem; flex-wrap:wrap; }
+  .stats b { display:block; font-size:1.3rem; }
+
+  .anomaly-banner { border:1px solid var(--flag); background:var(--flag-dim);
+    padding:12px 16px; font-size:0.85rem; margin-bottom:10px; }
+  .anomaly-banner .tag { background:var(--flag); color:#0A0C10; font-size:0.65rem;
+    font-weight:700; padding:2px 7px; margin-right:8px; }
+
+  .topcard { border:1px solid var(--flag); background:var(--panel); padding:16px; }
+  .topcard .tabs { display:flex; gap:6px; margin-bottom:10px; }
+  .topcard .tabs button { padding:5px 12px; font-size:0.75rem; background:var(--panel-alt);
+    color:var(--muted); border:1px solid var(--border); }
+  .topcard .tabs button.active { background:var(--flag); color:#0A0C10; border-color:var(--flag); }
+  .topcard .pane { font-size:0.88rem; }
+
+  .sort-row { display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+  .sort-row select, .sort-row input[type=text] { background:var(--panel); border:1px solid var(--border);
+    color:var(--text); padding:6px 10px; font-size:0.78rem; font-family:inherit; }
+
+  details { border:1px solid var(--border); margin-bottom:10px; }
+  summary { cursor:pointer; padding:10px 14px; font-size:0.82rem; font-weight:600;
+    background:var(--panel); list-style:none; display:flex; justify-content:space-between; }
+  summary::-webkit-details-marker { display:none; }
+  summary .count { color:var(--muted); font-weight:400; }
+  .bucket-body { padding:10px 14px 14px; background:var(--panel); }
+
+  .finding { border:1px solid var(--border); background:var(--panel-alt);
+    padding:14px 16px; margin-bottom:10px; }
+  .finding:last-child { margin-bottom:0; }
+  .finding-top { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .score { font-family:"IBM Plex Mono",monospace; font-weight:600; width:26px; text-align:center;
+    padding:2px 0; border:1px solid var(--border); flex-shrink:0; }
+  .score.high { color:var(--flag); border-color:var(--flag); }
+  .score.mid { color:var(--warn); border-color:var(--warn); }
+  .score.low { color:var(--healthy); border-color:var(--healthy); }
+  .finding-path { font-family:"IBM Plex Mono",monospace; font-size:0.85rem; }
+  .finding-row { font-size:0.78rem; margin:3px 0; }
+  .finding-row .k { color:var(--muted); }
+  .evidence { font-size:0.76rem; color:var(--muted); margin-top:6px; padding-left:14px; }
+  .empty { color:var(--muted); font-size:0.85rem; font-style:italic; }
+  .copy-row { text-align:right; margin-top:8px; }
+
+  footer { padding:32px 0 48px; font-size:0.78rem; color:var(--muted); text-align:center; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><div class="wrap">
+  <div class="brand">Codebase Autopsy</div>
+  <div class="badge">⚡ Powered by <b>IBM Bob 2.0</b></div>
+</div></div>
+
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">IBM BOB 2.0 HACKATHON SUBMISSION</div>
+  <h1>Your docstrings promise one thing. Your code quietly does another.</h1>
+  <div class="hero-sub">Codebase Autopsy audits a repo for architectural drift — modules whose real behavior no longer matches their declared purpose — before a new hire, a reviewer, or an incident finds it the hard way.</div>
+  <div class="cta-row">
+    <a href="#tool" class="btn btn-primary">Analyze a repo ↓</a>
+    <a href="#how" class="btn btn-ghost">See how it works</a>
+  </div>
+  <div class="mini-stats">
+    <span>AST-based structural analysis</span>
+    <span>Real IBM Bob 2.0 reasoning</span>
+    <span>Ranked, evidence-backed findings</span>
+  </div>
+</div></header>
+
+<section class="page" id="problem"><div class="wrap">
+  <div class="section-eyebrow">THE PROBLEM</div>
+  <h2>Tech debt that nobody scheduled time to notice</h2>
+  <div class="problem-grid">
+    <div>
+      <p>A "pure math utility" module starts writing files. A "logging helper" starts triggering business logic. Nobody catches this as it happens — it surfaces later, during onboarding, or as a surprise in a code review.</p>
+      <p>Codebase Autopsy combines fast, deterministic static analysis with IBM Bob 2.0's repo-aware reasoning to catch this automatically, and rank it by how bad the drift actually is.</p>
+    </div>
+    <div class="case-card">
+      <div class="path mono">app/math_utils.py</div>
+      <div class="case-row"><span class="k">DECLARED</span>Pure math utility functions, no side effects</div>
+      <div class="case-row"><span class="k">OBSERVED</span>Writes files to disk, calls a logger</div>
+      <div class="case-row"><span class="k">DRIFT SCORE</span><span class="mono" style="color:var(--flag);">8 / 10</span></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="page" id="how"><div class="wrap">
+  <div class="section-eyebrow">HOW IT WORKS</div>
+  <h2>Four stages, one real AI call where it counts</h2>
+  <div class="pipeline">
+    <div class="pipe-stage"><div class="pipe-num mono">01</div><div class="pipe-name">Ingest</div>
+      <div class="pipe-desc">Walk the repo, parse every .py file with Python's ast module.</div></div>
+    <div class="pipe-stage"><div class="pipe-num mono">02</div><div class="pipe-name">Graph</div>
+      <div class="pipe-desc">Build a dependency graph, detect import cycles. No AI needed here.</div></div>
+    <div class="pipe-stage"><div class="pipe-num mono">03</div><div class="pipe-name">Bob 2.0</div>
+      <div class="pipe-desc">For each documented module, judge declared vs. actual behavior.</div></div>
+    <div class="pipe-stage"><div class="pipe-num mono">04</div><div class="pipe-name">Report</div>
+      <div class="pipe-desc">Rank modules by drift score, surface evidence and cycles.</div></div>
+  </div>
+</div></section>
+
+<section class="page" id="value"><div class="wrap">
+  <div class="section-eyebrow">WHY IT MATTERS</div>
+  <h2>Built for real developer workflows</h2>
+  <div class="value-grid">
+    <div class="value-card"><div class="n mono">01</div><h3>Faster onboarding</h3>
+      <p>New hires get an honest map of the codebase on day one, instead of rebuilding it from stale docstrings.</p></div>
+    <div class="value-card"><div class="n mono">02</div><h3>Objective code review</h3>
+      <p>"This file no longer does what it claims" becomes a scored, evidence-backed finding, not a vague hunch.</p></div>
+    <div class="value-card"><div class="n mono">03</div><h3>Tech debt triage</h3>
+      <p>Prioritize refactors by drift score instead of anecdote — an easy conversation with product and leadership.</p></div>
+    <div class="value-card"><div class="n mono">04</div><h3>Early risk detection</h3>
+      <p>A "pure" module quietly doing I/O or network calls is exactly what turns into an incident later.</p></div>
+  </div>
+</div></section>
+
+<section class="page" id="tool"><div class="wrap">
+  <div class="section-eyebrow">RUN IT YOURSELF</div>
+  <h2>Try it on a real repo</h2>
+
+  <form id="f">
+    <input type="text" id="repo" placeholder="https://github.com/org/repo or a local path" required>
+    <label class="mock"><input type="checkbox" id="mock" checked> mock mode (no Bobcoins used)</label>
+    <button type="submit" id="go">Analyze</button>
+  </form>
+  <div class="cold-start-note">⏳ Running on a free-tier server — if this is the first visit in a while, the page or the first analysis may take up to ~60s to respond while it spins back up. It's not stuck.</div>
+  <div class="example-row">
+    <button type="button" class="ghost" id="example">Try an example repo</button>
+  </div>
+  <div class="status" id="status"></div>
+
+  <div id="results" style="display:none;">
+    <div id="summaryBanner"></div>
+
+    <div class="subsection"><div class="stats" id="stats"></div></div>
+
+    <div class="subsection">
+      <div class="section-label">IMPORT CYCLES</div>
+      <div id="cycles"></div>
+    </div>
+
+    <div class="subsection" id="topSection" style="display:none;">
+      <div class="section-label">TOP FINDING — declared vs. observed</div>
+      <div class="topcard">
+        <div class="tabs">
+          <button type="button" id="tabDeclared" class="active">Declared</button>
+          <button type="button" id="tabObserved">Observed</button>
+        </div>
+        <div class="pane" id="topPane"></div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="section-label">FINDINGS</div>
+      <div class="sort-row">
+        <select id="sortBy">
+          <option value="score-desc">Score: high to low</option>
+          <option value="score-asc">Score: low to high</option>
+          <option value="path">Path: A-Z</option>
+        </select>
+        <input type="text" id="filterPath" placeholder="filter by path...">
+      </div>
+      <div id="buckets"></div>
+      <div class="copy-row"><button type="button" class="ghost" id="copyMd">Copy results as Markdown</button></div>
+    </div>
+  </div>
+</div></section>
+
+<footer>Built for the IBM Bob 2.0 Hackathon · lablab.ai · Sept 25–27, 2026</footer>
+
+<script>
+const EXAMPLE_REPO = 'https://github.com/navdeep-G/samplemod';
+let currentReport = null;
+
+document.getElementById('example').addEventListener('click', () => {
+  document.getElementById('repo').value = EXAMPLE_REPO;
+});
+
+const form = document.getElementById('f');
+const statusEl = document.getElementById('status');
+const goBtn = document.getElementById('go');
+const results = document.getElementById('results');
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const repo = document.getElementById('repo').value.trim();
+  const mock = document.getElementById('mock').checked;
+  goBtn.disabled = true;
+  statusEl.className = 'status';
+  statusEl.textContent = 'Starting...';
+  results.style.display = 'none';
+
+  const url = `/api/analyze/stream?repo=${encodeURIComponent(repo)}&mock=${mock}`;
+  const es = new EventSource(url);
+
+  es.onmessage = (e) => {
+    const ev = JSON.parse(e.data);
+    if (ev.type === 'scan') {
+      statusEl.textContent = `Found ${ev.module_count} modules, ${ev.to_analyze} to analyze...`;
+    } else if (ev.type === 'progress') {
+      statusEl.textContent = `Analyzing ${ev.current}/${ev.total}: ${ev.path}`;
+    } else if (ev.type === 'error') {
+      const msg = ev.detail || 'Analysis failed';
+      statusEl.className = 'status ' + (msg.includes('BOB_API_KEY') ? 'warn' : 'error');
+      statusEl.textContent = msg.includes('BOB_API_KEY')
+        ? 'Bob is not configured on this server — only mock mode is available here.'
+        : (msg.toLowerCase().includes('refus') || msg.toLowerCase().includes('does not exist')
+           ? 'Invalid repo: ' + msg
+           : 'Analysis failed: ' + msg);
+      goBtn.disabled = false;
+      es.close();
+    } else if (ev.type === 'done') {
+      currentReport = ev.report;
+      render(ev.report);
+      statusEl.className = 'status';
+      statusEl.textContent = ev.report.analysis_truncated
+        ? 'Done. (Capped at max_modules — repo has more documented modules than were checked.)'
+        : 'Done.';
+      goBtn.disabled = false;
+      es.close();
+    }
+  };
+
+  es.onerror = () => {
+    if (goBtn.disabled) {
+      statusEl.className = 'status error';
+      statusEl.textContent = 'Connection to server lost.';
+      goBtn.disabled = false;
+    }
+    es.close();
+  };
+});
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+
+function scoreClass(score) {
+  if (typeof score !== 'number') return 'low';
+  if (score >= 7) return 'high';
+  if (score >= 4) return 'mid';
+  return 'low';
+}
+
+function render(data) {
+  const total = data.verdicts.length;
+  const significant = data.verdicts.filter(v => (v.drift_score || 0) >= 4).length;
+
+  const banner = document.getElementById('summaryBanner');
+  banner.innerHTML = significant > 0
+    ? `<div class="summary-banner">${significant} of ${total} modules show significant drift — check the findings below, worst first.</div>`
+    : `<div class="summary-banner clean">All ${total} checked modules match their declared purpose. No significant drift found.</div>`;
+
+  const u = data.usage || {};
+  document.getElementById('stats').innerHTML = `
+    <div><b>${data.module_count}</b><span style="color:var(--muted);">modules scanned</span></div>
+    <div><b>${data.import_cycles.length}</b><span style="color:var(--muted);">import cycles</span></div>
+    <div><b>${total}</b><span style="color:var(--muted);">analyzed by Bob</span></div>
+    <div><b>${u.total_tokens ?? 0}</b><span style="color:var(--muted);">tokens \u00b7 ~${u.total_cost ?? 0} Bobcoins</span></div>`;
+
+  document.getElementById('cycles').innerHTML = data.import_cycles.length
+    ? data.import_cycles.map(c =>
+        `<div class="anomaly-banner"><span class="tag">CYCLE</span><span class="mono">${esc(c.join(' \u2192 '))}</span></div>`
+      ).join('')
+    : '<div class="empty">No import cycles found.</div>';
+
+  const sorted = [...data.verdicts].sort((a, b) => (b.drift_score || 0) - (a.drift_score || 0));
+  const topSection = document.getElementById('topSection');
+  if (sorted.length && (sorted[0].drift_score || 0) > 0) {
+    topSection.style.display = 'block';
+    const top = sorted[0];
+    const pane = document.getElementById('topPane');
+    pane.dataset.declared = esc(top.declared_purpose || '(none)');
+    pane.dataset.observed = esc(top.observed_behavior || '(none)');
+    pane.dataset.path = esc(top.path);
+    showTab('declared');
+  } else {
+    topSection.style.display = 'none';
+  }
+
+  renderBuckets();
+  results.style.display = 'block';
+}
+
+function showTab(which) {
+  const pane = document.getElementById('topPane');
+  const declaredTxt = pane.dataset.declared, observedTxt = pane.dataset.observed, path = pane.dataset.path;
+  document.getElementById('tabDeclared').classList.toggle('active', which === 'declared');
+  document.getElementById('tabObserved').classList.toggle('active', which === 'observed');
+  pane.innerHTML = `<div class="finding-path" style="margin-bottom:8px;">${path}</div>` +
+    (which === 'declared' ? declaredTxt : observedTxt);
+}
+document.getElementById('tabDeclared').addEventListener('click', () => showTab('declared'));
+document.getElementById('tabObserved').addEventListener('click', () => showTab('observed'));
+
+function renderBuckets() {
+  if (!currentReport) return;
+  const sortVal = document.getElementById('sortBy').value;
+  const filterVal = document.getElementById('filterPath').value.trim().toLowerCase();
+
+  let verdicts = currentReport.verdicts.filter(v =>
+    !filterVal || (v.path || '').toLowerCase().includes(filterVal));
+
+  verdicts.sort((a, b) => {
+    if (sortVal === 'score-asc') return (a.drift_score || 0) - (b.drift_score || 0);
+    if (sortVal === 'path') return (a.path || '').localeCompare(b.path || '');
+    return (b.drift_score || 0) - (a.drift_score || 0);
+  });
+
+  const buckets = { critical: [], moderate: [], clean: [] };
+  verdicts.forEach(v => {
+    const s = v.drift_score || 0;
+    (s >= 7 ? buckets.critical : s >= 4 ? buckets.moderate : buckets.clean).push(v);
+  });
+
+  const bucketsEl = document.getElementById('buckets');
+  if (!verdicts.length) {
+    bucketsEl.innerHTML = '<div class="empty">No matching modules.</div>';
+    return;
+  }
+
+  const renderFinding = (v) => {
+    const score = v.drift_score ?? '?';
+    const evidence = (v.evidence || []).map(e => `<li>${esc(e)}</li>`).join('');
+    return `<div class="finding">
+      <div class="finding-top">
+        <div class="score ${scoreClass(v.drift_score)} mono">${esc(score)}</div>
+        <div class="finding-path">${esc(v.path)}</div>
+      </div>
+      <div class="finding-row"><span class="k">declared:</span> ${esc(v.declared_purpose)}</div>
+      <div class="finding-row"><span class="k">observed:</span> ${esc(v.observed_behavior)}</div>
+      ${evidence ? `<ul class="evidence">${evidence}</ul>` : ''}
+    </div>`;
+  };
+
+  const section = (label, items, openByDefault) => items.length ? `
+    <details ${openByDefault ? 'open' : ''}>
+      <summary>${label} <span class="count">${items.length}</span></summary>
+      <div class="bucket-body">${items.map(renderFinding).join('')}</div>
+    </details>` : '';
+
+  bucketsEl.innerHTML =
+    section('Critical (7-10)', buckets.critical, true) +
+    section('Moderate (4-6)', buckets.moderate, true) +
+    section('Clean (0-3)', buckets.clean, false);
+}
+
+document.getElementById('sortBy').addEventListener('change', renderBuckets);
+document.getElementById('filterPath').addEventListener('input', renderBuckets);
+
+document.getElementById('copyMd').addEventListener('click', async () => {
+  if (!currentReport) return;
+  const d = currentReport;
+  let md = `# Codebase Autopsy Report\n\n`;
+  md += `Modules scanned: ${d.module_count} \u00b7 Import cycles: ${d.import_cycles.length} \u00b7 Analyzed: ${d.verdicts.length}\n\n`;
+  if (d.import_cycles.length) {
+    md += `## Import Cycles\n\n`;
+    d.import_cycles.forEach(c => { md += `- ${c.join(' -> ')}\n`; });
+    md += `\n`;
+  }
+  md += `## Findings\n\n`;
+  [...d.verdicts].sort((a, b) => (b.drift_score || 0) - (a.drift_score || 0)).forEach(v => {
+    md += `### [${v.drift_score ?? '?'}] ${v.path}\n`;
+    md += `- declared: ${v.declared_purpose}\n- observed: ${v.observed_behavior}\n`;
+    (v.evidence || []).forEach(e => { md += `- evidence: ${e}\n`; });
+    md += `\n`;
+  });
+  await navigator.clipboard.writeText(md);
+  const btn = document.getElementById('copyMd');
+  const orig = btn.textContent;
+  btn.textContent = 'Copied!';
+  setTimeout(() => { btn.textContent = orig; }, 1500);
+});
+</script>
+</body>
+</html>
